@@ -1,0 +1,153 @@
+{
+    "last_updated": "2026-03-31T11:59:30.501562+00:00",
+    "sources": [
+        {
+            "name": "mysql_stock",
+            "type": "mysql",
+            "database": "stock_pipeline"
+        }
+    ],
+    "nodes": [
+        {
+            "id": "mysql_stock.stock_pipeline",
+            "type": "database",
+            "edges": [
+                {
+                    "relation": "HAS_TABLE",
+                    "target": "mysql_stock.stock_events"
+                }
+            ],
+            "database": "stock_pipeline"
+        },
+        {
+            "id": "mysql_stock.stock_events",
+            "type": "table",
+            "edges": [
+                {
+                    "relation": "HAS_COLUMN",
+                    "target": "mysql_stock.stock_events.id"
+                },
+                {
+                    "relation": "HAS_COLUMN",
+                    "target": "mysql_stock.stock_events.symbol"
+                },
+                {
+                    "relation": "HAS_COLUMN",
+                    "target": "mysql_stock.stock_events.price_renew"
+                },
+                {
+                    "relation": "HAS_COLUMN",
+                    "target": "mysql_stock.stock_events.volume"
+                },
+                {
+                    "relation": "HAS_COLUMN",
+                    "target": "mysql_stock.stock_events.timestamp"
+                },
+                {
+                    "relation": "HAS_COLUMN",
+                    "target": "mysql_stock.stock_events.exchange"
+                },
+                {
+                    "relation": "HAS_COLUMN",
+                    "target": "mysql_stock.stock_events.currency"
+                }
+            ],
+            "database": "stock_pipeline"
+        },
+        {
+            "id": "mysql_stock.stock_events.id",
+            "type": "column",
+            "edges": [],
+            "datatype": "varchar",
+            "nullable": "NO"
+        },
+        {
+            "id": "mysql_stock.stock_events.symbol",
+            "type": "column",
+            "edges": [],
+            "datatype": "varchar",
+            "nullable": "YES"
+        },
+        {
+            "id": "mysql_stock.stock_events.price_renew",
+            "type": "column",
+            "edges": [],
+            "datatype": "float",
+            "nullable": "YES"
+        },
+        {
+            "id": "mysql_stock.stock_events.volume",
+            "type": "column",
+            "edges": [],
+            "datatype": "int",
+            "nullable": "YES"
+        },
+        {
+            "id": "mysql_stock.stock_events.timestamp",
+            "type": "column",
+            "edges": [],
+            "datatype": "bigint",
+            "nullable": "YES"
+        },
+        {
+            "id": "mysql_stock.stock_events.exchange",
+            "type": "column",
+            "edges": [],
+            "datatype": "varchar",
+            "nullable": "YES"
+        },
+        {
+            "id": "mysql_stock.stock_events.currency",
+            "type": "column",
+            "edges": [],
+            "datatype": "varchar",
+            "nullable": "YES"
+        }
+    ],
+    "consumer_state": {
+        "metadata_events": [
+            {
+                "timestamp": "2026-03-31T11:52:46.340640+00:00",
+                "table": "stock_events",
+                "summary": "Column 'symbol' in table 'stock_events' was renamed to 'symbol_renamed'.",
+                "dag": [
+                    {
+                        "operation": "RENAME_COLUMN",
+                        "table": "stock_events",
+                        "previous_name": "symbol",
+                        "current_name": "symbol_renamed",
+                        "graph_field": "symbol"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-03-31T11:55:22.653661+00:00",
+                "table": "stock_events",
+                "summary": "Renamed column 'symbol_renamed' to 'symbol' in table 'stock_events'.",
+                "dag": [
+                    {
+                        "operation": "RENAME_COLUMN",
+                        "table": "stock_events",
+                        "previous_name": "symbol_renamed",
+                        "current_name": "symbol",
+                        "graph_field": "symbol_renamed"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-03-31T11:59:30.493186+00:00",
+                "table": "stock_events",
+                "summary": "Renamed column 'price' to 'price_renew' in table 'stock_events'.",
+                "dag": [
+                    {
+                        "operation": "RENAME_COLUMN",
+                        "table": "stock_events",
+                        "previous_name": "price",
+                        "current_name": "price_renew",
+                        "graph_field": "price"
+                    }
+                ]
+            }
+        ]
+    }
+}

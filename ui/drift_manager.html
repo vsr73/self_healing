@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Producer Metadata</title>
+    <style>
+        :root {
+            --bg: #f4efe6;
+            --panel: #fffaf2;
+            --ink: #1f2937;
+            --muted: #6b7280;
+            --line: #e7d8bf;
+            --accent: #bb4d00;
+            --accent-soft: #ffe4cf;
+            --success: #1f7a4d;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Georgia, "Times New Roman", serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(187, 77, 0, 0.10), transparent 28%),
+                linear-gradient(135deg, #f4efe6 0%, #f7f1df 100%);
+            min-height: 100vh;
+        }
+        .wrap { max-width: 920px; margin: 0 auto; padding: 32px 20px 48px; }
+        h1 { margin: 0 0 8px; font-size: clamp(2rem, 3vw, 3.2rem); line-height: 1; }
+        .subtitle { margin: 0 0 22px; color: var(--muted); font-size: 1rem; }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(53, 33, 7, 0.08);
+            overflow: hidden;
+        }
+        .panel-head {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255, 228, 207, 0.5);
+        }
+        .panel-title { margin: 0; font-size: 1.3rem; }
+        .panel-meta { margin: 8px 0 0; color: var(--muted); }
+        .grid {
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+            gap: 12px;
+            padding: 18px 24px;
+            align-items: center;
+        }
+        .grid.header {
+            padding-top: 24px;
+            padding-bottom: 10px;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+        .row { border-top: 1px solid rgba(231, 216, 191, 0.7); }
+        .column-name { font-weight: 700; }
+        .datatype { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+        input[type="text"] {
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px 14px;
+            font: inherit;
+            background: #fff;
+        }
+        .actions {
+            display: flex;
+            gap: 12px;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px 24px;
+            border-top: 1px solid var(--line);
+            flex-wrap: wrap;
+        }
+        button {
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 18px;
+            font: inherit;
+            cursor: pointer;
+        }
+        .save { background: var(--accent); color: #fff; }
+        .reset { background: var(--accent-soft); color: var(--accent); }
+        .status { color: var(--muted); }
+        .status.success { color: var(--success); }
+        @media (max-width: 720px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <h1>Producer Metadata</h1>
+        <p class="subtitle">Edit source-side names using the table's current columns, then save and test the producer/consumer flow from this fresh state.</p>
+
+        <section class="panel">
+            <div class="panel-head">
+                <h2 class="panel-title">Current Table Columns</h2>
+                <p class="panel-meta" id="table-name">Loading table...</p>
+            </div>
+
+            <div class="grid header">
+                <div>Current Table Column</div>
+                <div>Next Source Name</div>
+            </div>
+
+            <div id="rows"></div>
+
+            <div class="actions">
+                <div>
+                    <button class="save" id="save-btn">Save</button>
+                    <button class="reset" id="reset-btn" type="button">Reset</button>
+                </div>
+                <div class="status" id="status-text">Waiting for table schema...</div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const rowsContainer = document.getElementById("rows");
+        const tableName = document.getElementById("table-name");
+        const statusText = document.getElementById("status-text");
+        const saveButton = document.getElementById("save-btn");
+        const resetButton = document.getElementById("reset-btn");
+
+        let schemaColumns = [];
+        let currentSourceNames = {};
+
+        function setStatus(message, isSuccess = false) {
+            statusText.textContent = message;
+            statusText.className = isSuccess ? "status success" : "status";
+        }
+
+        function createRow(column) {
+            const row = document.createElement("div");
+            row.className = "grid row";
+
+            const currentColumn = document.createElement("div");
+            currentColumn.innerHTML = `<div class="column-name">${column.name}</div><div class="datatype">${column.datatype}</div>`;
+
+            const inputWrap = document.createElement("div");
+            const input = document.createElement("input");
+            input.type = "text";
+            input.placeholder = `Next source name for ${column.name}`;
+            input.value = currentSourceNames[column.name] || column.name;
+            input.dataset.tableColumn = column.name;
+            inputWrap.appendChild(input);
+
+            row.appendChild(currentColumn);
+            row.appendChild(inputWrap);
+            return row;
+        }
+
+        function renderRows() {
+            rowsContainer.innerHTML = "";
+            schemaColumns.forEach((column) => rowsContainer.appendChild(createRow(column)));
+        }
+
+        function collectRenames() {
+            const inputs = rowsContainer.querySelectorAll("input[data-table-column]");
+            const renames = {};
+            inputs.forEach((input) => {
+                const value = input.value.trim();
+                if (!value || value === input.dataset.tableColumn) {
+                    return;
+                }
+                renames[input.dataset.tableColumn] = value;
+            });
+            return renames;
+        }
+
+        async function loadData() {
+            setStatus("Loading table schema...");
+            const response = await fetch("/api/schema");
+            const payload = await response.json();
+            schemaColumns = payload.columns || [];
+            currentSourceNames = {};
+            schemaColumns.forEach((column) => {
+                currentSourceNames[column.name] = column.source_name || column.name;
+            });
+            tableName.textContent = `Table: ${payload.table}`;
+            renderRows();
+            setStatus("Table schema loaded.");
+        }
+
+        saveButton.addEventListener("click", async () => {
+            const renames = collectRenames();
+            setStatus("Saving producer metadata...");
+            const response = await fetch("/api/producer-metadata", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ renames }),
+            });
+            const payload = await response.json();
+            currentSourceNames = {};
+            Object.entries(payload.next_source_names || payload.last_applied_names || {}).forEach(([tableColumn, sourceName]) => {
+                currentSourceNames[tableColumn] = sourceName;
+            });
+            renderRows();
+            setStatus("Producer metadata updated.", true);
+        });
+
+        resetButton.addEventListener("click", () => {
+            renderRows();
+            setStatus("Inputs reset to the last saved state.");
+        });
+
+        loadData().catch(() => {
+            setStatus("Failed to load table schema.");
+        });
+    </script>
+</body>
+</html>

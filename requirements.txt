@@ -1,0 +1,5 @@
+pymysql
+faker
+kafka-python
+google-genai
+pypdf

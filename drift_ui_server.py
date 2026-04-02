@@ -45,6 +45,7 @@ def load_ui_state():
             for name, datatype in live_schema.items()
         ],
         "source_columns": source_columns,
+        "pending_additions": producer_metadata.get("pending_additions", {}),
         "last_updated": producer_metadata.get("last_updated", ""),
     }
 
@@ -77,6 +78,28 @@ def build_producer_metadata_log(previous_names, new_names):
     }
 
 
+def build_addition_log(additions):
+    return {
+        "event_type": "PRODUCER_METADATA_UPDATED",
+        "source": "drift_ui",
+        "table": TABLE_NAME,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "changes": [
+            {
+                "table_column": name,
+                "previous_name": None,
+                "current_name": name,
+                "change_type": "add_column",
+                "datatype": datatype,
+            }
+            for name, datatype in additions.items()
+        ],
+        "producer_metadata": {
+            "pending_additions": additions,
+        },
+    }
+
+
 def publish_log_event(event):
     producer = build_producer()
     try:
@@ -99,12 +122,13 @@ def generate_ui_sample_data():
     }
     generator = StockEventGenerator()
     simulator = ManualRenameDriftSimulator(
-        canonical_schema=schema,
+        graph_schema=schema,
         table_name=TABLE_NAME,
         current_names=current_names,
         target_names=current_names,
+        pending_additions=producer_metadata.get("pending_additions", {}),
     )
-    simulator.sync_renames()
+    simulator.sync_changes()
     graph_event = generator.generate_event()
     source_event = simulator.apply_to_event(graph_event)
     return {
@@ -184,10 +208,17 @@ class DriftUIHandler(BaseHTTPRequestHandler):
             )
         )
         renames = payload.get("renames", {})
+        additions = payload.get("additions", {})
 
         if not isinstance(renames, dict):
             self._send_json(
                 {"error": "`renames` must be an object."},
+                status=HTTPStatus.BAD_REQUEST,
+            )
+            return
+        if not isinstance(additions, dict):
+            self._send_json(
+                {"error": "`additions` must be an object."},
                 status=HTTPStatus.BAD_REQUEST,
             )
             return
@@ -210,7 +241,20 @@ class DriftUIHandler(BaseHTTPRequestHandler):
             )
             for table_column in schema
         }
+        sanitized_additions = {}
+        for column_name, datatype in additions.items():
+            if not isinstance(column_name, str) or not isinstance(datatype, str):
+                continue
+            column_name = column_name.strip()
+            datatype = datatype.strip().lower()
+            if not column_name or column_name in schema:
+                continue
+            if datatype not in {"varchar", "text", "int", "integer", "bigint", "float", "double", "decimal"}:
+                datatype = "varchar"
+            sanitized_additions[column_name] = datatype
+
         producer_metadata["next_source_names"] = dict(new_names)
+        producer_metadata["pending_additions"] = sanitized_additions
         save_producer_metadata(producer_metadata, BASE_DIR / "producer_metadata.json")
         metadata_log = build_producer_metadata_log(
             previous_names,
@@ -218,6 +262,8 @@ class DriftUIHandler(BaseHTTPRequestHandler):
         )
         if metadata_log["changes"]:
             publish_log_event(metadata_log)
+        if sanitized_additions:
+            publish_log_event(build_addition_log(sanitized_additions))
         self._send_json(producer_metadata)
 
 

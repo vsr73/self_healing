@@ -50,13 +50,14 @@ def main():
 
             if args.drift:
                 drift_simulator = ManualRenameDriftSimulator(
-                    canonical_schema=live_schema,
+                    graph_schema=live_schema,
                     table_name=SCHEMA_DRIFT_SETTINGS["table_name"],
                     current_names=producer_metadata.get("last_applied_names", {}),
                     target_names=producer_metadata.get(
                         "next_source_names",
                         producer_metadata.get("last_applied_names", {}),
                     ),
+                    pending_additions=producer_metadata.get("pending_additions", {}),
                 )
             else:
                 drift_simulator = None
@@ -67,7 +68,7 @@ def main():
                 else None
             )
             base_event = generator.generate_event(event_fields)
-            change_logs = drift_simulator.sync_renames() if drift_simulator else []
+            change_logs = drift_simulator.sync_changes() if drift_simulator else []
             event = (
                 drift_simulator.apply_to_event(base_event)
                 if drift_simulator
@@ -90,6 +91,7 @@ def main():
                     drift_simulator.current_names[field]: field
                     for field in live_schema
                 }
+                producer_metadata["pending_additions"] = {}
                 save_producer_metadata(producer_metadata)
             sent += 1
             print(

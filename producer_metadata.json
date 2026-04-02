@@ -3,38 +3,39 @@
     "source_schema": {
         "id": "varchar",
         "symbol": "varchar",
-        "price_renew": "float",
+        "price": "float",
         "volume": "int",
-        "timestamp": "bigint",
+        "ts": "bigint",
         "exchange": "varchar",
         "currency": "varchar"
     },
     "source_to_graph": {
         "id": "id",
         "symbol": "symbol",
-        "price_renew": "price_renew",
+        "price": "price",
         "volume": "volume",
-        "timestamp": "timestamp",
+        "ts": "ts",
         "exchange": "exchange",
         "currency": "currency"
     },
     "next_source_names": {
         "id": "id",
         "symbol": "symbol",
-        "price_renew": "price_renew",
+        "price": "price",
         "volume": "volume",
-        "timestamp": "timestamp",
+        "ts": "ts",
         "exchange": "exchange",
         "currency": "currency"
     },
     "last_applied_names": {
         "id": "id",
         "symbol": "symbol",
-        "price_renew": "price_renew",
+        "price": "price",
         "volume": "volume",
-        "timestamp": "timestamp",
+        "ts": "ts",
         "exchange": "exchange",
         "currency": "currency"
     },
-    "last_updated": "2026-03-31T11:59:30.501905+00:00"
+    "last_updated": "2026-04-02T18:32:36.882091+00:00",
+    "pending_additions": {}
 }

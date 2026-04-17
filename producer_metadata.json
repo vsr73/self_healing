@@ -20,10 +20,10 @@
     },
     "next_source_names": {
         "id": "id",
-        "symbol": "symbol",
-        "price": "price",
+        "symbol": "symbol_renamed",
+        "price": "price_renamed",
         "volume": "volume",
-        "ts": "ts",
+        "ts": "time_stamp",
         "exchange": "exchange",
         "currency": "currency"
     },
@@ -36,6 +36,6 @@
         "exchange": "exchange",
         "currency": "currency"
     },
-    "last_updated": "2026-04-02T18:32:36.882091+00:00",
+    "last_updated": "2026-04-02T19:45:23.031377+00:00",
     "pending_additions": {}
 }

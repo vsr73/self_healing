@@ -1,11 +1,16 @@
 import argparse
 import time
 
-from pipeline.config import KAFKA_SETTINGS, PIPELINE_DEFAULTS, SCHEMA_DRIFT_SETTINGS
+from pipeline.config import KAFKA_SETTINGS, PIPELINE_DEFAULTS, SCHEMA_DRIFT_SETTINGS, get_managed_tables
 from pipeline.drift import ManualRenameDriftSimulator
 from pipeline.generator import StockEventGenerator
 from pipeline.kafka_utils import build_producer
-from pipeline.metadata_store import ensure_producer_metadata, load_graph, save_producer_metadata
+from pipeline.metadata_store import (
+    ensure_producer_metadata,
+    load_graph,
+    producer_metadata_path_for_table,
+    save_producer_metadata,
+)
 from pipeline.schema import extract_table_schema
 
 
@@ -38,66 +43,68 @@ def main():
     raw_topic = KAFKA_SETTINGS["topics"]["raw"]
     logs_topic = KAFKA_SETTINGS["topics"]["logs"]
 
-    drift_simulator = None
-    producer_metadata = None
-
     sent = 0
     try:
         while True:
             graph = load_graph()
-            live_schema = extract_table_schema(graph, SCHEMA_DRIFT_SETTINGS["table_name"])
-            producer_metadata = ensure_producer_metadata(graph)
-
-            if args.drift:
-                drift_simulator = ManualRenameDriftSimulator(
-                    graph_schema=live_schema,
-                    table_name=SCHEMA_DRIFT_SETTINGS["table_name"],
-                    current_names=producer_metadata.get("last_applied_names", {}),
-                    target_names=producer_metadata.get(
-                        "next_source_names",
-                        producer_metadata.get("last_applied_names", {}),
-                    ),
-                    pending_additions=producer_metadata.get("pending_additions", {}),
+            for table_name in get_managed_tables():
+                meta_path = producer_metadata_path_for_table(table_name)
+                live_schema = extract_table_schema(graph, table_name)
+                producer_metadata = ensure_producer_metadata(
+                    graph, path=None, table_name=table_name
                 )
-            else:
-                drift_simulator = None
 
-            event_fields = (
-                list(live_schema.keys())
-                if producer_metadata
-                else None
-            )
-            base_event = generator.generate_event(event_fields)
-            change_logs = drift_simulator.sync_changes() if drift_simulator else []
-            event = (
-                drift_simulator.apply_to_event(base_event)
-                if drift_simulator
-                else base_event
-            )
+                if args.drift:
+                    drift_simulator = ManualRenameDriftSimulator(
+                        graph_schema=live_schema,
+                        table_name=table_name,
+                        current_names=producer_metadata.get("last_applied_names", {}),
+                        target_names=producer_metadata.get(
+                            "next_source_names",
+                            producer_metadata.get("last_applied_names", {}),
+                        ),
+                        pending_additions=producer_metadata.get("pending_additions", {}),
+                    )
+                else:
+                    drift_simulator = None
 
-            for change_log in change_logs:
-                producer.send(logs_topic, value=change_log)
-                print(f"Published schema change log: {change_log}")
-            producer.send(raw_topic, value=event)
+                event_fields = list(live_schema.keys()) if producer_metadata else None
+                base_event = generator.generate_event(event_fields)
+                change_logs = drift_simulator.sync_changes() if drift_simulator else []
+                event = (
+                    drift_simulator.apply_to_event(base_event)
+                    if drift_simulator
+                    else base_event
+                )
 
-            producer.flush()
-            if drift_simulator:
-                producer_metadata["last_applied_names"] = dict(drift_simulator.current_names)
-                producer_metadata["source_schema"] = {
-                    drift_simulator.current_names[field]: live_schema[field]
-                    for field in live_schema
-                }
-                producer_metadata["source_to_graph"] = {
-                    drift_simulator.current_names[field]: field
-                    for field in live_schema
-                }
-                producer_metadata["pending_additions"] = {}
-                save_producer_metadata(producer_metadata)
-            sent += 1
-            print(
-                f"Produced event {sent} | sent keys: {list(event.keys())} | "
-                f"event_id: {event.get('event_id', event.get('id', 'n/a'))}"
-            )
+                # Tag event with routing key; consumer strips this before DB insert
+                event["_table"] = table_name
+
+                for change_log in change_logs:
+                    producer.send(logs_topic, value=change_log)
+                    print(f"[{table_name}] Published schema change log: {change_log}")
+                producer.send(raw_topic, value=event)
+
+                producer.flush()
+                if drift_simulator:
+                    producer_metadata["last_applied_names"] = dict(drift_simulator.current_names)
+                    producer_metadata["source_schema"] = {
+                        drift_simulator.current_names[field]: live_schema[field]
+                        for field in live_schema
+                    }
+                    producer_metadata["source_to_graph"] = {
+                        drift_simulator.current_names[field]: field
+                        for field in live_schema
+                    }
+                    producer_metadata["pending_additions"] = {}
+                    save_producer_metadata(producer_metadata, str(meta_path))
+
+                sent += 1
+                print(
+                    f"[{table_name}] Produced event {sent} | "
+                    f"keys: {[k for k in event if k != '_table']} | "
+                    f"event_id: {event.get('event_id', event.get('id', 'n/a'))}"
+                )
 
             if args.count and sent >= args.count:
                 break

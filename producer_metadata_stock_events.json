@@ -1,0 +1,45 @@
+{
+    "table": "stock_events",
+    "source_schema": {
+        "id": "varchar",
+        "symbol_ new": "varchar",
+        "price_new": "float",
+        "volume_new": "int",
+        "time_new": "bigint",
+        "exchange_new": "varchar",
+        "currency": "varchar",
+        "need": "varchar"
+    },
+    "source_to_graph": {
+        "id": "id",
+        "symbol_ new": "symbol_renamed",
+        "price_new": "price_renamed",
+        "volume_new": "volume_new",
+        "time_new": "time_stamp",
+        "exchange_new": "exchange_renamed",
+        "currency": "currency",
+        "need": "need"
+    },
+    "next_source_names": {
+        "id": "id",
+        "symbol_renamed": "symbol_ new",
+        "price_renamed": "price_new",
+        "volume_new": "volume_new",
+        "time_stamp": "time_new",
+        "exchange_renamed": "exchange_new",
+        "currency": "currency",
+        "need": "need"
+    },
+    "last_applied_names": {
+        "id": "id",
+        "symbol_renamed": "symbol_ new",
+        "price_renamed": "price_new",
+        "volume_new": "volume_new",
+        "time_stamp": "time_new",
+        "exchange_renamed": "exchange_new",
+        "currency": "currency",
+        "need": "need"
+    },
+    "last_updated": "2026-04-17T05:45:40.186947+00:00",
+    "pending_additions": {}
+}

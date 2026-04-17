@@ -4,72 +4,56 @@ from pipeline.config import LLM_SETTINGS
 from pipeline.schema import extract_table_schema
 
 
+def _get_operations(change_event):
+    """Return the list of operations from either the batched or legacy format."""
+    ops = change_event.get("operations")
+    if ops:
+        return ops
+    single = change_event.get("operation")
+    return [single] if single else []
+
+
 def build_consumer_prompt(change_event, graph):
     table_name = change_event["table"]
+    operations = _get_operations(change_event)
+    schema_json = json.dumps(extract_table_schema(graph, table_name), indent=2)
+    ops_json = json.dumps(operations, indent=2)
+
     return f"""
-You are a database schema change extractor and repair planner.
-The consumer received a Kafka schema drift log for a MySQL source table.
-You must produce both:
-1. a structured schema repair DAG
-2. executable MySQL DDL statements
+You are a database schema repair planner for a self-healing data pipeline.
+The consumer received a Kafka schema drift log for MySQL table `{table_name}`.
+There may be ONE or MULTIPLE operations — you must handle ALL of them in a single response.
 
-Rules:
-- Return ONLY valid JSON.
-- Use the Kafka schema change log as the source of truth.
-- The `dag` must be a JSON array whose elements are one of:
-  {{
-    "operation": "RENAME_COLUMN",
-    "table": "stock_events",
-    "previous_name": "price",
-    "current_name": "renamed_price",
-    "graph_field": "price"
-  }}
-  {{
-    "operation": "ADD_COLUMN",
-    "table": "stock_events",
-    "column": "new_col",
-    "datatype": "varchar"
-  }}
-  {{
-    "operation": "DROP_COLUMN",
-    "table": "stock_events",
-    "column": "old_col",
-    "graph_field": "old_col"
-  }}
-  {{
-    "operation": "CREATE_TABLE",
-    "table": "new_table"
-  }}
-  {{
-    "operation": "DROP_TABLE",
-    "table": "old_table"
-  }}
-  {{
-    "operation": "RENAME_TABLE",
-    "old_table": "a",
-    "new_table": "b"
-  }}
-- `ddl_statements` must be a JSON array of MySQL DDL strings.
-- `alias_mappings` must map current source names to stable graph field names where applicable.
-- `summary` must be short and practical.
+RULES:
+- Return ONLY valid JSON. No markdown fences, no explanation, no extra keys.
+- Your `dag` array must contain one entry for EVERY operation listed below.
+- Your `ddl_statements` array must contain one executable MySQL DDL string per operation.
+- `alias_mappings` maps every current source name to its stable graph field name.
+- `summary` describes all changes in one sentence.
 
-Return a JSON object with exactly these top-level keys:
+Allowed `dag` element shapes:
+  {{"operation":"RENAME_COLUMN","table":"{table_name}","previous_name":"old","current_name":"new","graph_field":"old"}}
+  {{"operation":"ADD_COLUMN","table":"{table_name}","column":"col","datatype":"varchar"}}
+  {{"operation":"DROP_COLUMN","table":"{table_name}","column":"col","graph_field":"col"}}
+  {{"operation":"CREATE_TABLE","table":"tbl"}}
+  {{"operation":"DROP_TABLE","table":"tbl"}}
+
+Return exactly this JSON structure (all keys required, arrays may have multiple elements):
 {{
-  "table": "stock_events",
-  "graph_field": "price",
-  "previous_name": "price",
-  "current_name": "renamed_price",
-  "datatype": "float",
-  "alias_mappings": {{"renamed_price": "price"}},
-  "dag": [...],
-  "ddl_statements": ["ALTER TABLE stock_events RENAME COLUMN price TO renamed_price;"],
-  "summary": "..."
+  "table": "{table_name}",
+  "alias_mappings": {{}},
+  "dag": [],
+  "ddl_statements": [],
+  "summary": ""
 }}
 
-Metadata graph schema for the table:
-{json.dumps(extract_table_schema(graph, table_name), indent=2)}
+Current metadata graph schema for `{table_name}`:
+{schema_json}
 
-Kafka schema change log received by the consumer:
+Operations to apply — handle ALL of them:
+{ops_json}
+
+Full Kafka change event:
 {json.dumps(change_event, indent=2)}
 """.strip()
 

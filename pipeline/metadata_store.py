@@ -1,9 +1,10 @@
 import json
+from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pipeline.config import CANONICAL_SCHEMA
+from pipeline.config import CANONICAL_SCHEMA, SCHEMA_DRIFT_SETTINGS, get_managed_tables
 
 
 def metadata_path(path="metadata_graph.json"):
@@ -11,7 +12,14 @@ def metadata_path(path="metadata_graph.json"):
 
 
 def producer_metadata_path(path="producer_metadata.json"):
+    """Legacy single-file path resolver. Used by callers that pass an explicit path."""
     return Path(path)
+
+
+def producer_metadata_path_for_table(table_name, base_dir=None):
+    """Return the per-table producer metadata file path."""
+    directory = Path(base_dir) if base_dir else Path(".")
+    return directory / f"producer_metadata_{table_name}.json"
 
 
 def load_graph(path="metadata_graph.json"):
@@ -23,14 +31,14 @@ def load_graph(path="metadata_graph.json"):
 
 
 def load_producer_metadata(path="producer_metadata.json"):
-    producer_path = producer_metadata_path(path)
+    producer_path = Path(path)
     with producer_path.open() as handle:
         return json.load(handle)
 
 
 def save_producer_metadata(metadata, path="producer_metadata.json"):
     metadata["last_updated"] = datetime.now(timezone.utc).isoformat()
-    producer_path = producer_metadata_path(path)
+    producer_path = Path(path)
     with producer_path.open("w") as handle:
         json.dump(metadata, handle, indent=4)
 
@@ -53,10 +61,38 @@ def build_producer_metadata_from_graph(graph, table_name="stock_events"):
     }
 
 
-def ensure_producer_metadata(graph=None, path="producer_metadata.json", table_name="stock_events"):
-    producer_path = producer_metadata_path(path)
+def ensure_producer_metadata(
+    graph=None,
+    path=None,
+    table_name="stock_events",
+    base_dir=None,
+):
+    """Load, validate, and if necessary create producer metadata for a single table.
+
+    When *path* is None the per-table file ``producer_metadata_{table_name}.json``
+    is used.  If that file does not exist yet but the legacy ``producer_metadata.json``
+    was written for the same table, its contents are migrated to the new file
+    automatically.  Callers that still pass an explicit *path* string keep the
+    old behaviour unchanged.
+    """
     schema = dict(CANONICAL_SCHEMA)
     schema_fields = list(schema.keys())
+
+    # --- resolve file path ---
+    if path is None:
+        new_path = producer_metadata_path_for_table(table_name, base_dir)
+        legacy_path = Path(base_dir or ".") / "producer_metadata.json"
+        if not new_path.exists() and legacy_path.exists():
+            try:
+                old_data = json.loads(legacy_path.read_text())
+                if old_data.get("table") == table_name:
+                    new_path.write_text(json.dumps(old_data, indent=4))
+            except (json.JSONDecodeError, OSError):
+                pass
+        producer_path = new_path
+    else:
+        producer_path = Path(path)
+
     live_graph_columns = {}
     if graph is not None:
         for node in graph.get("nodes", []):
@@ -67,7 +103,7 @@ def ensure_producer_metadata(graph=None, path="producer_metadata.json", table_na
                 live_graph_columns[parts[-1]] = node.get("datatype")
 
     if producer_path.exists():
-        metadata = load_producer_metadata(path)
+        metadata = load_producer_metadata(str(producer_path))
         metadata.setdefault("table", table_name)
         source_to_graph = metadata.get("source_to_graph", metadata.get("source_to_canonical", {}))
         source_schema = metadata.get("source_schema", {})
@@ -87,10 +123,12 @@ def ensure_producer_metadata(graph=None, path="producer_metadata.json", table_na
                 metadata["source_schema"] = {
                     last_applied_names.get(field, field): schema[field]
                     for field in schema_fields
+                    if field in schema
                 }
                 metadata["source_to_graph"] = {
                     last_applied_names.get(field, field): field
                     for field in schema_fields
+                    if field in schema
                 }
             else:
                 bootstrap_schema = live_graph_columns or schema
@@ -105,8 +143,8 @@ def ensure_producer_metadata(graph=None, path="producer_metadata.json", table_na
             metadata.pop("current_names", None)
             metadata.pop("schema", None)
 
-        metadata.setdefault("source_schema", {field: schema[field] for field in schema_fields})
-        metadata.setdefault("source_to_graph", {field: field for field in schema_fields})
+        metadata.setdefault("source_schema", {field: schema[field] for field in schema_fields if field in schema})
+        metadata.setdefault("source_to_graph", {field: field for field in schema_fields if field in schema})
         if "last_applied_names" not in metadata:
             metadata["last_applied_names"] = {
                 graph_field: source_name
@@ -117,17 +155,17 @@ def ensure_producer_metadata(graph=None, path="producer_metadata.json", table_na
             dict(metadata.get("last_applied_names", {})),
         )
         metadata.pop("source_to_canonical", None)
-        save_producer_metadata(metadata, path)
+        save_producer_metadata(metadata, str(producer_path))
         return metadata
 
     metadata = {
         "table": table_name,
-        "source_schema": {field: schema[field] for field in schema_fields},
-        "source_to_graph": {field: field for field in schema_fields},
-        "next_source_names": {field: field for field in schema_fields},
-        "last_applied_names": {field: field for field in schema_fields},
+        "source_schema": {field: schema[field] for field in schema_fields if field in schema},
+        "source_to_graph": {field: field for field in schema_fields if field in schema},
+        "next_source_names": {field: field for field in schema_fields if field in schema},
+        "last_applied_names": {field: field for field in schema_fields if field in schema},
     }
-    save_producer_metadata(metadata, path)
+    save_producer_metadata(metadata, str(producer_path))
     return metadata
 
 
@@ -139,10 +177,47 @@ def save_graph(graph, path="metadata_graph.json"):
 
 
 def initialize_graph_extensions(graph):
-    state = graph.setdefault("consumer_state", {})
-    metadata_events = graph.pop("metadata_events", [])
-    state.setdefault("metadata_events", metadata_events)
+    """Ensure consumer_state uses the per-table structure.
 
+    Runs the one-time migration from the legacy flat ``metadata_events`` list
+    to the nested ``consumer_state.tables.<table>.metadata_events`` layout.
+    The migration is idempotent: after the first ``save_graph`` call the flat
+    key is gone and this function becomes a no-op.
+    """
+    state = graph.setdefault("consumer_state", {})
+
+    # Case A: very old top-level metadata_events key
+    top_level_events = graph.pop("metadata_events", None)
+    if top_level_events:
+        state.setdefault("metadata_events", top_level_events)
+
+    # Case B: flat metadata_events directly on consumer_state (current single-table format)
+    flat_events = state.pop("metadata_events", None)
+
+    tables = state.setdefault("tables", {})
+
+    if flat_events is not None:
+        grouped = defaultdict(list)
+        for ev in flat_events:
+            grouped[ev.get("table", "stock_events")].append(ev)
+        for tbl, evs in grouped.items():
+            tbl_state = tables.setdefault(tbl, {})
+            existing = tbl_state.setdefault("metadata_events", [])
+            existing_keys = {(e.get("timestamp"), e.get("summary")) for e in existing}
+            for ev in evs:
+                key = (ev.get("timestamp"), ev.get("summary"))
+                if key not in existing_keys:
+                    existing.append(ev)
+                    existing_keys.add(key)
+
+    # Ensure every managed table has a default sub-state entry
+    for tbl in get_managed_tables():
+        tbl_state = tables.setdefault(tbl, {})
+        tbl_state.setdefault("metadata_events", [])
+        tbl_state.setdefault("aliases", {})
+        tbl_state.setdefault("drift_status", "healthy")
+
+    state.setdefault("dependencies", [])
     return graph
 
 
@@ -151,10 +226,27 @@ def get_consumer_state(graph):
     return graph["consumer_state"]
 
 
+def get_table_state(graph, table_name):
+    """Return the per-table consumer state dict, initializing defaults if absent."""
+    initialize_graph_extensions(graph)
+    return graph["consumer_state"]["tables"].setdefault(
+        table_name,
+        {"metadata_events": [], "aliases": {}, "drift_status": "healthy"},
+    )
+
+
 def reset_consumer_state(graph):
     initialize_graph_extensions(graph)
+    tables = {}
+    for tbl in get_managed_tables():
+        tables[tbl] = {
+            "metadata_events": [],
+            "aliases": {},
+            "drift_status": "healthy",
+        }
     graph["consumer_state"] = {
-        "metadata_events": [],
+        "tables": tables,
+        "dependencies": [],
     }
     return graph
 
@@ -279,12 +371,13 @@ def apply_schema_dag_to_graph(graph, dag):
 def apply_schema_update_plan(graph, plan):
     initialize_graph_extensions(graph)
     updated_graph = deepcopy(graph)
-    state = get_consumer_state(updated_graph)
+    table_name = plan["table"]
+    tbl_state = get_table_state(updated_graph, table_name)
 
-    state["metadata_events"].append(
+    tbl_state["metadata_events"].append(
         {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "table": plan["table"],
+            "table": table_name,
             "summary": plan.get("summary", ""),
             "dag": plan.get("dag", []),
         }

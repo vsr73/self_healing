@@ -1,0 +1,29 @@
+{
+    "table": "stock_profiles",
+    "source_schema": {
+        "id": "varchar",
+        "basic": "int",
+        "new": "varchar"
+    },
+    "source_to_graph": {
+        "id": "id",
+        "basic": "basic",
+        "new": "new"
+    },
+    "next_source_names": {
+        "event_id": "event_id",
+        "symbol": "symbol",
+        "price": "price",
+        "volume": "volume",
+        "timestamp": "timestamp",
+        "exchange": "exchange",
+        "currency": "currency"
+    },
+    "last_applied_names": {
+        "id": "id",
+        "basic": "basic",
+        "new": "new"
+    },
+    "last_updated": "2026-04-17T05:45:40.191464+00:00",
+    "pending_additions": {}
+}

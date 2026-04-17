@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pipeline.config import SCHEMA_DRIFT_SETTINGS
 from pipeline.metadata_store import (
     reset_consumer_state,
     save_graph,
@@ -23,18 +24,22 @@ def _reset_legacy_files():
     (BASE_DIR / "generated_data.jsonl").write_text("")
 
 
-def _reset_producer_metadata(graph, table_name="stock_events"):
-    live_schema = extract_table_schema(graph, table_name)
-    metadata = {
-        "table": table_name,
-        "source_schema": dict(live_schema),
-        "source_to_graph": {field: field for field in live_schema},
-        "next_source_names": {field: field for field in live_schema},
-        "last_applied_names": {field: field for field in live_schema},
-        "last_updated": datetime.now(timezone.utc).isoformat(),
-    }
-    _write_json(BASE_DIR / "producer_metadata.json", metadata)
-    return metadata
+def _reset_producer_metadata(graph):
+    """Reset per-table producer metadata files for all managed tables."""
+    results = {}
+    for table_name in SCHEMA_DRIFT_SETTINGS["managed_tables"]:
+        live_schema = extract_table_schema(graph, table_name)
+        metadata = {
+            "table": table_name,
+            "source_schema": dict(live_schema),
+            "source_to_graph": {field: field for field in live_schema},
+            "next_source_names": {field: field for field in live_schema},
+            "last_applied_names": {field: field for field in live_schema},
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+        }
+        _write_json(BASE_DIR / f"producer_metadata_{table_name}.json", metadata)
+        results[table_name] = metadata
+    return results
 
 
 def main():
@@ -42,20 +47,28 @@ def main():
     graph = reset_consumer_state(graph)
     save_graph(graph)
 
-    producer_metadata = _reset_producer_metadata(graph)
+    all_metadata = _reset_producer_metadata(graph)
     _reset_legacy_files()
 
     print(
         json.dumps(
             {
                 "status": "reset_complete",
-                "topics": {
-                    "raw": "stock_raw_v3",
-                    "clean": "stock_clean_v3",
-                    "logs": "schema_logs_v3",
+                "managed_tables": SCHEMA_DRIFT_SETTINGS["managed_tables"],
+                "per_table": {
+                    tbl: {
+                        "live_columns": [
+                            node["id"].split(".")[-1]
+                            for node in graph["nodes"]
+                            if node.get("type") == "column"
+                            and f".{tbl}." in node.get("id", "")
+                        ],
+                        "producer_source_columns": sorted(
+                            all_metadata[tbl].get("source_schema", {}).keys()
+                        ),
+                    }
+                    for tbl in SCHEMA_DRIFT_SETTINGS["managed_tables"]
                 },
-                "live_columns": [node["id"].split(".")[-1] for node in graph["nodes"] if node.get("type") == "column" and ".stock_events." in node.get("id", "")],
-                "producer_source_columns": sorted(producer_metadata.get("source_schema", {}).keys()),
                 "legacy_files_reset": [
                     "manual_drift_config.json",
                     "drift_events.jsonl",

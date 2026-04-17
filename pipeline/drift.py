@@ -58,8 +58,10 @@ class ManualRenameDriftSimulator:
         return schema
 
     def sync_changes(self):
+        """Collect all pending renames and additions and return them as a SINGLE
+        batched SCHEMA_CHANGE event (if any changes exist) or an empty list."""
         requested_renames = self._load_requested_renames()
-        change_logs = []
+        operations = []
 
         for graph_field in self.graph_schema:
             target_name = requested_renames.get(graph_field, graph_field)
@@ -69,44 +71,43 @@ class ManualRenameDriftSimulator:
 
             before_schema = self.current_schema_snapshot()
             self.current_names[graph_field] = target_name
-            change_logs.append(
+            operations.append(
                 {
-                    "event_type": "SCHEMA_CHANGE",
-                    "change_id": str(uuid.uuid4()),
-                    "table": self.table_name,
-                    "operation": {
-                        "type": "rename_column",
-                        "graph_field": graph_field,
-                        "from": current_name,
-                        "to": target_name,
-                    },
-                    "before_schema": before_schema,
-                    "after_schema": self.current_schema_snapshot(),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "type": "rename_column",
+                    "graph_field": graph_field,
+                    "from": current_name,
+                    "to": target_name,
                 }
             )
 
+        # Check against real graph columns only, not pending_additions themselves
+        existing_cols = {self.current_names[f] for f in self.graph_schema}
         for field_name, datatype in self.pending_additions.items():
-            if field_name in self.current_schema_snapshot():
+            if field_name in existing_cols:
                 continue
-            before_schema = self.current_schema_snapshot()
-            change_logs.append(
+            operations.append(
                 {
-                    "event_type": "SCHEMA_CHANGE",
-                    "change_id": str(uuid.uuid4()),
-                    "table": self.table_name,
-                    "operation": {
-                        "type": "add_column",
-                        "field": field_name,
-                        "datatype": datatype,
-                    },
-                    "before_schema": before_schema,
-                    "after_schema": {**before_schema, field_name: datatype},
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "type": "add_column",
+                    "field": field_name,
+                    "datatype": datatype,
                 }
             )
 
-        return change_logs
+        if not operations:
+            return []
+
+        # One batched event covering every operation — consumer gets a single
+        # LLM call and applies all DDL + DAG atomically.
+        batched_event = {
+            "event_type": "SCHEMA_CHANGE",
+            "change_id": str(uuid.uuid4()),
+            "table": self.table_name,
+            "operations": operations,
+            "before_schema": {},   # populated by caller if needed
+            "after_schema": self.current_schema_snapshot(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return [batched_event]
 
     def _default_value_for_addition(self, field_name, datatype, source_event):
         normalized_name = field_name.lower()
@@ -151,14 +152,24 @@ class SchemaChangeTracker:
         self.alias_map = {}
 
     def apply_change_log(self, change_log):
-        operation = change_log["operation"]
-        operation_type = operation["type"]
+        # Support both new batched format (operations list) and legacy single operation
+        operations = change_log.get("operations") or []
+        if not operations:
+            single_op = change_log.get("operation")
+            if single_op:
+                operations = [single_op]
 
-        if operation_type == "rename_column":
-            graph_field = operation.get("graph_field", operation.get("canonical_field", operation["from"]))
-            self.alias_map[operation["to"]] = graph_field
-        elif operation_type == "add_column":
-            self.alias_map[operation["field"]] = operation["field"]
+        for operation in operations:
+            if not operation:
+                continue
+            operation_type = operation.get("type")
+            if operation_type == "rename_column":
+                graph_field = operation.get(
+                    "graph_field", operation.get("canonical_field", operation["from"])
+                )
+                self.alias_map[operation["to"]] = graph_field
+            elif operation_type == "add_column":
+                self.alias_map[operation["field"]] = operation["field"]
 
         self.change_history.append(change_log)
 

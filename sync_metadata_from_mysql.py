@@ -100,10 +100,14 @@ def sync_metadata_graph():
         save_graph(live_graph, OUTPUT_PATH)
         return live_graph
 
+    # initialize_graph_extensions (called inside get_consumer_state) already
+    # migrates any legacy flat metadata_events list to the per-table structure.
     previous_state = get_consumer_state(previous_graph)
-    if "metadata_events" in previous_state:
+    tables = previous_state.get("tables", {})
+    if tables:
         live_graph.setdefault("consumer_state", {})
-        live_graph["consumer_state"]["metadata_events"] = previous_state["metadata_events"]
+        live_graph["consumer_state"]["tables"] = tables
+        live_graph["consumer_state"]["dependencies"] = previous_state.get("dependencies", [])
 
     save_graph(live_graph, OUTPUT_PATH)
     return live_graph

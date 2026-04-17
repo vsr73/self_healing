@@ -1,0 +1,6 @@
+{
+    "managed_tables": [
+        "stock_events",
+        "stock_profiles"
+    ]
+}

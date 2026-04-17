@@ -1,0 +1,281 @@
+[
+  {
+    "id": "TC01",
+    "category": "EASY",
+    "name": "Single rename: price \u2192 price_usd",
+    "verdict": "PASS",
+    "checks": {
+      "S_structure": [
+        true,
+        ""
+      ],
+      "D_ddl": [
+        true,
+        ""
+      ],
+      "G_dag": [
+        true,
+        ""
+      ],
+      "F_graph_field": [
+        true,
+        ""
+      ],
+      "E_e2e": [
+        true,
+        ""
+      ]
+    },
+    "llm_time": 10.11,
+    "error": null,
+    "repair_summary": "Renamed the 'price' column to 'price_usd' in the 'stock_events' table.",
+    "repair_dag_len": 1,
+    "repair_ddl_len": 1
+  },
+  {
+    "id": "TC02",
+    "category": "EASY",
+    "name": "Single add column: +region varchar",
+    "verdict": "PASS",
+    "checks": {
+      "S_structure": [
+        true,
+        ""
+      ],
+      "D_ddl": [
+        true,
+        ""
+      ],
+      "G_dag": [
+        true,
+        ""
+      ],
+      "F_graph_field": [
+        true,
+        ""
+      ],
+      "E_e2e": [
+        true,
+        ""
+      ]
+    },
+    "llm_time": 6.61,
+    "error": null,
+    "repair_summary": "Added column 'region' to the 'stock_events' table.",
+    "repair_dag_len": 1,
+    "repair_ddl_len": 1
+  },
+  {
+    "id": "TC03",
+    "category": "EASY",
+    "name": "Single rename: symbol \u2192 ticker",
+    "verdict": "PASS",
+    "checks": {
+      "S_structure": [
+        true,
+        ""
+      ],
+      "D_ddl": [
+        true,
+        ""
+      ],
+      "G_dag": [
+        true,
+        ""
+      ],
+      "F_graph_field": [
+        true,
+        ""
+      ],
+      "E_e2e": [
+        true,
+        ""
+      ]
+    },
+    "llm_time": 4.99,
+    "error": null,
+    "repair_summary": "Renamed column `symbol` to `ticker` in table `stock_events`.",
+    "repair_dag_len": 1,
+    "repair_ddl_len": 1
+  },
+  {
+    "id": "TC04",
+    "category": "MEDIUM",
+    "name": "Batch rename: price \u2192 price_usd  AND  symbol \u2192 ticker",
+    "verdict": "PASS",
+    "checks": {
+      "S_structure": [
+        true,
+        ""
+      ],
+      "D_ddl": [
+        true,
+        ""
+      ],
+      "G_dag": [
+        true,
+        ""
+      ],
+      "F_graph_field": [
+        true,
+        ""
+      ],
+      "E_e2e": [
+        true,
+        ""
+      ]
+    },
+    "llm_time": 5.04,
+    "error": null,
+    "repair_summary": "Renamed column 'price' to 'price_usd' and 'symbol' to 'ticker' in table 'stock_events'.",
+    "repair_dag_len": 2,
+    "repair_ddl_len": 2
+  },
+  {
+    "id": "TC05",
+    "category": "MEDIUM",
+    "name": "Batch: price \u2192 cost  AND  +region varchar",
+    "verdict": "PASS",
+    "checks": {
+      "S_structure": [
+        true,
+        ""
+      ],
+      "D_ddl": [
+        true,
+        ""
+      ],
+      "G_dag": [
+        true,
+        ""
+      ],
+      "F_graph_field": [
+        true,
+        ""
+      ],
+      "E_e2e": [
+        true,
+        ""
+      ]
+    },
+    "llm_time": 13.79,
+    "error": null,
+    "repair_summary": "Renamed column price to cost and added new column region to table stock_events.",
+    "repair_dag_len": 2,
+    "repair_ddl_len": 2
+  },
+  {
+    "id": "TC06",
+    "category": "MEDIUM",
+    "name": "Rename ts \u2192 event_timestamp (long descriptive name)",
+    "verdict": "PASS",
+    "checks": {
+      "S_structure": [
+        true,
+        ""
+      ],
+      "D_ddl": [
+        true,
+        ""
+      ],
+      "G_dag": [
+        true,
+        ""
+      ],
+      "F_graph_field": [
+        true,
+        ""
+      ],
+      "E_e2e": [
+        true,
+        ""
+      ]
+    },
+    "llm_time": 3.98,
+    "error": null,
+    "repair_summary": "Renamed column `ts` to `event_timestamp` in table `stock_events`.",
+    "repair_dag_len": 1,
+    "repair_ddl_len": 1
+  },
+  {
+    "id": "TC07",
+    "category": "MEDIUM",
+    "name": "Rename exchange \u2192 exchange_code  AND  currency \u2192 base_currency",
+    "verdict": "ERROR",
+    "checks": {},
+    "llm_time": null,
+    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 27.450280882s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '27s'}]}}"
+  },
+  {
+    "id": "TC08",
+    "category": "HARD",
+    "name": "Chain rename: price_renamed \u2192 price_final  (graph already shows price_renamed)",
+    "verdict": "ERROR",
+    "checks": {},
+    "llm_time": null,
+    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 40.513104324s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '40s'}]}}"
+  },
+  {
+    "id": "TC09",
+    "category": "HARD",
+    "name": "Batch 3 renames: price\u2192price_usd, volume\u2192qty, ts\u2192trade_time",
+    "verdict": "ERROR",
+    "checks": {},
+    "llm_time": null,
+    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 4.803010661s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '4s'}]}}"
+  },
+  {
+    "id": "TC10",
+    "category": "HARD",
+    "name": "Rename id \u2192 trade_id  (primary key column rename)",
+    "verdict": "ERROR",
+    "checks": {},
+    "llm_time": null,
+    "error": "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)"
+  },
+  {
+    "id": "TC11",
+    "category": "HARD",
+    "name": "Batch 4 ops: 3 renames + 1 add column",
+    "verdict": "ERROR",
+    "checks": {},
+    "llm_time": null,
+    "error": "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)"
+  },
+  {
+    "id": "TC12",
+    "category": "EDGE",
+    "name": "Add 3 columns at once: +session_id, +risk_score, +region",
+    "verdict": "ERROR",
+    "checks": {},
+    "llm_time": null,
+    "error": "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)"
+  },
+  {
+    "id": "TC13",
+    "category": "EDGE",
+    "name": "Rename volume \u2192 volm (abbreviation drift, easy to confuse)",
+    "verdict": "ERROR",
+    "checks": {},
+    "llm_time": null,
+    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 13.424086422s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '13s'}]}}"
+  },
+  {
+    "id": "TC14",
+    "category": "EDGE",
+    "name": "Impossible rename: volume \u2192 price  (target column already exists)",
+    "verdict": "ERROR",
+    "checks": {},
+    "llm_time": null,
+    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 38.336034344s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '38s'}]}}"
+  },
+  {
+    "id": "TC15",
+    "category": "EDGE",
+    "name": "Stress: rename ALL 7 columns simultaneously",
+    "verdict": "ERROR",
+    "checks": {},
+    "llm_time": null,
+    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 4.176617994s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'model': 'gemini-2.5-flash', 'location': 'global'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '4s'}]}}"
+  }
+]

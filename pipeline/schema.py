@@ -59,7 +59,9 @@ def get_alias_map(graph, table_name):
         for alias in node.get("aliases", []):
             alias_map[alias] = canonical
 
-    for alias, canonical in _consumer_state(graph).get("aliases", {}).get(table_name, {}).items():
+    tables = _consumer_state(graph).get("tables", {})
+    tbl_aliases = tables.get(table_name, {}).get("aliases", {})
+    for alias, canonical in tbl_aliases.items():
         alias_map[alias] = canonical
 
     return alias_map

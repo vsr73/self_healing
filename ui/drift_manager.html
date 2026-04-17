@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Producer Metadata</title>
+    <title>Schema Drift Manager</title>
     <style>
         :root {
             --bg: #f4efe6;
@@ -12,207 +12,693 @@
             --muted: #6b7280;
             --line: #e7d8bf;
             --accent: #bb4d00;
+            --accent-h: #9a3d00;
             --accent-soft: #ffe4cf;
             --success: #1f7a4d;
+            --success-soft: #d1fae5;
+            --warn: #92400e;
+            --warn-soft: #fef3c7;
+            --danger: #b91c1c;
+            --danger-soft: #fee2e2;
+            --new: #1d4ed8;
+            --new-soft: #dbeafe;
         }
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            margin: 0;
             font-family: Georgia, "Times New Roman", serif;
             color: var(--ink);
             background:
-                radial-gradient(circle at top left, rgba(187, 77, 0, 0.10), transparent 28%),
+                radial-gradient(circle at top left, rgba(187,77,0,0.10), transparent 28%),
                 linear-gradient(135deg, #f4efe6 0%, #f7f1df 100%);
             min-height: 100vh;
         }
-        .wrap { max-width: 920px; margin: 0 auto; padding: 32px 20px 48px; }
-        h1 { margin: 0 0 8px; font-size: clamp(2rem, 3vw, 3.2rem); line-height: 1; }
-        .subtitle { margin: 0 0 22px; color: var(--muted); font-size: 1rem; }
+        .wrap { max-width: 960px; margin: 0 auto; padding: 36px 20px 64px; }
+
+        /* ── page header ────────────────────────────────────────────────────── */
+        .page-header { margin-bottom: 28px; }
+        .page-header h1 { font-size: clamp(1.9rem, 3vw, 2.9rem); line-height: 1.1; }
+        .page-header p  { color: var(--muted); margin-top: 6px; font-size: .97rem; }
+
+        /* ── table tabs ─────────────────────────────────────────────────────── */
+        .table-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .table-bar-label {
+            font-size: .78rem;
+            text-transform: uppercase;
+            letter-spacing: .09em;
+            color: var(--muted);
+            margin-right: 4px;
+            white-space: nowrap;
+        }
+        .tab {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 8px 18px;
+            font: inherit;
+            font-size: .9rem;
+            cursor: pointer;
+            background: var(--panel);
+            color: var(--muted);
+            transition: all .14s;
+        }
+        .tab:hover  { border-color: var(--accent); color: var(--accent); }
+        .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+        .tab-skeleton {
+            height: 36px; width: 120px; border-radius: 999px;
+            background: var(--line);
+            animation: pulse 1.3s ease-in-out infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+        /* ── panels ─────────────────────────────────────────────────────────── */
         .panel {
             background: var(--panel);
             border: 1px solid var(--line);
             border-radius: 20px;
-            box-shadow: 0 20px 50px rgba(53, 33, 7, 0.08);
+            box-shadow: 0 18px 48px rgba(53,33,7,.08);
             overflow: hidden;
+            margin-bottom: 20px;
         }
         .panel-head {
-            padding: 20px 24px;
+            padding: 18px 26px;
             border-bottom: 1px solid var(--line);
-            background: rgba(255, 228, 207, 0.5);
-        }
-        .panel-title { margin: 0; font-size: 1.3rem; }
-        .panel-meta { margin: 8px 0 0; color: var(--muted); }
-        .grid {
-            display: grid;
-            grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+            background: rgba(255,228,207,.45);
+            display: flex;
+            align-items: baseline;
             gap: 12px;
-            padding: 18px 24px;
+            flex-wrap: wrap;
+        }
+        .panel-title { font-size: 1.15rem; }
+        .panel-badge {
+            font-size: .76rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            border-radius: 999px;
+            padding: 3px 10px;
+        }
+        .badge-orange { background: var(--accent-soft); color: var(--accent); }
+        .badge-blue   { background: var(--new-soft);    color: var(--new);    }
+        .panel-meta   { color: var(--muted); font-size: .87rem; margin-left: auto; }
+
+        /* ── column grid ────────────────────────────────────────────────────── */
+        .col-grid {
+            display: grid;
+            grid-template-columns: minmax(190px,1fr) minmax(190px,1fr);
+            gap: 10px;
+            padding: 12px 26px;
             align-items: center;
         }
-        .grid.header {
-            padding-top: 24px;
-            padding-bottom: 10px;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--muted);
+        .col-grid.header {
+            padding-top: 18px; padding-bottom: 8px;
+            font-size: .78rem; text-transform: uppercase;
+            letter-spacing: .08em; color: var(--muted);
         }
-        .row { border-top: 1px solid rgba(231, 216, 191, 0.7); }
-        .column-name { font-weight: 700; }
-        .datatype { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
-        input[type="text"] {
+        .col-row { border-top: 1px solid rgba(231,216,191,.6); }
+        .col-name { font-weight: 700; }
+        .col-type { color: var(--muted); font-size: .83rem; margin-top: 3px; }
+
+        input[type="text"], select {
             width: 100%;
             border: 1px solid var(--line);
-            border-radius: 12px;
-            padding: 12px 14px;
+            border-radius: 10px;
+            padding: 9px 13px;
             font: inherit;
             background: #fff;
+            color: var(--ink);
+            transition: border-color .14s;
         }
+        input[type="text"]:focus, select:focus { outline: none; border-color: var(--accent); }
+        input.changed { border-color: var(--accent); background: #fff9f5; }
+
+        /* ── add-column strip ───────────────────────────────────────────────── */
+        .add-col-section {
+            padding: 14px 26px 18px;
+            border-top: 1px solid var(--line);
+            background: rgba(255,250,242,.55);
+        }
+        .strip-title {
+            font-size: .76rem; text-transform: uppercase;
+            letter-spacing: .08em; color: var(--muted);
+            margin-bottom: 10px;
+        }
+        .add-col-row {
+            display: grid;
+            grid-template-columns: 1fr 150px auto;
+            gap: 10px; align-items: center;
+        }
+        .pending-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 7px; }
+        .tag {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: var(--warn-soft); color: var(--warn);
+            border-radius: 999px; padding: 4px 12px; font-size: .83rem;
+        }
+        .tag button {
+            background: none; border: none; cursor: pointer;
+            color: var(--warn); font-size: 1rem; line-height: 1; padding: 0 2px;
+        }
+
+        /* ── actions bar ────────────────────────────────────────────────────── */
         .actions {
-            display: flex;
-            gap: 12px;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 24px 24px;
+            display: flex; gap: 10px;
+            justify-content: space-between; align-items: center;
+            padding: 16px 26px 20px;
             border-top: 1px solid var(--line);
             flex-wrap: wrap;
         }
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
         button {
-            border: 0;
-            border-radius: 999px;
-            padding: 12px 18px;
-            font: inherit;
-            cursor: pointer;
+            border: 0; border-radius: 999px;
+            padding: 10px 20px; font: inherit;
+            cursor: pointer; transition: opacity .14s, background .14s;
         }
-        .save { background: var(--accent); color: #fff; }
-        .reset { background: var(--accent-soft); color: var(--accent); }
-        .status { color: var(--muted); }
-        .status.success { color: var(--success); }
-        @media (max-width: 720px) {
-            .grid { grid-template-columns: 1fr; }
+        button:disabled { opacity: .4; cursor: not-allowed; }
+        .btn-primary  { background: var(--accent);       color: #fff; }
+        .btn-primary:hover:not(:disabled)  { background: var(--accent-h); }
+        .btn-secondary { background: var(--accent-soft); color: var(--accent); }
+        .btn-ghost    { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+        .btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+        .btn-new      { background: var(--new-soft);    color: var(--new); font-weight: 700; }
+        .btn-new:hover:not(:disabled) { background: #bfdbfe; }
+        .btn-danger   { background: var(--danger-soft); color: var(--danger); }
+        .btn-danger:hover:not(:disabled) { background: #fecaca; }
+        .btn-sm       { padding: 6px 14px; font-size: .88rem; }
+
+        .status { font-size: .88rem; color: var(--muted); }
+        .status.ok   { color: var(--success); }
+        .status.err  { color: var(--danger); }
+        .status.info { color: var(--new); }
+
+        /* ── create-table panel ─────────────────────────────────────────────── */
+        #create-panel { display: none; }
+        #create-panel.open { display: block; }
+
+        .create-toggle {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 20px;
+        }
+        .divider {
+            flex: 1; height: 1px; background: var(--line);
+        }
+
+        .create-col-list { padding: 16px 26px 4px; }
+        .create-col-row {
+            display: grid;
+            grid-template-columns: 1fr 150px 36px;
+            gap: 8px; align-items: center;
+            margin-bottom: 8px;
+        }
+        .remove-row-btn {
+            background: none; border: none; cursor: pointer;
+            color: var(--muted); font-size: 1.2rem; line-height: 1;
+            padding: 4px; border-radius: 6px;
+            transition: color .12s;
+        }
+        .remove-row-btn:hover { color: var(--danger); }
+
+        .create-add-row {
+            padding: 0 26px 16px;
+        }
+
+        .ddl-preview {
+            margin: 0 26px 16px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-family: "Courier New", monospace;
+            font-size: .83rem;
+            line-height: 1.5;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        .ddl-preview-label {
+            margin: 0 26px 6px;
+            font-size: .76rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--muted);
+        }
+
+        /* ── empty / skeleton ───────────────────────────────────────────────── */
+        .empty-state { padding: 36px 26px; text-align: center; color: var(--muted); }
+        .skeleton-row {
+            height: 46px; margin: 2px 0;
+            background: linear-gradient(90deg,var(--line) 25%,#f5ecd6 50%,var(--line) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite; border-radius: 10px;
+        }
+        @keyframes shimmer { 0%{background-position:200%} 100%{background-position:-200%} }
+
+        @media (max-width: 600px) {
+            .col-grid, .create-col-row { grid-template-columns: 1fr; }
+            .add-col-row { grid-template-columns: 1fr 1fr; }
+            .create-col-row .remove-row-btn { justify-self: start; }
         }
     </style>
 </head>
 <body>
-    <main class="wrap">
-        <h1>Producer Metadata</h1>
-        <p class="subtitle">Edit source-side names using the table's current columns, then save and test the producer/consumer flow from this fresh state.</p>
+<main class="wrap">
 
-        <section class="panel">
-            <div class="panel-head">
-                <h2 class="panel-title">Current Table Columns</h2>
-                <p class="panel-meta" id="table-name">Loading table...</p>
+    <header class="page-header">
+        <h1>Schema Drift Manager</h1>
+        <p>Control source-side schema drift per table and create new tables. Changes are batched into a single atomic LLM repair cycle.</p>
+    </header>
+
+    <!-- ── Table selector tabs ──────────────────────────────────────────────── -->
+    <div class="table-bar">
+        <span class="table-bar-label">Table</span>
+        <div id="table-tabs"><div class="tab-skeleton"></div></div>
+    </div>
+
+    <!-- ── Column editor panel ──────────────────────────────────────────────── -->
+    <div class="panel" id="editor-panel">
+        <div class="panel-head">
+            <span class="panel-title">Columns</span>
+            <span class="panel-badge badge-orange" id="col-count-badge">—</span>
+            <span class="panel-meta" id="last-updated-meta"></span>
+        </div>
+
+        <div class="col-grid header">
+            <div>Current Table Column</div>
+            <div>Next Source Name (rename target)</div>
+        </div>
+
+        <div id="col-rows">
+            <div class="empty-state">Select a table above to begin.</div>
+        </div>
+
+        <!-- Pending additions -->
+        <div class="add-col-section">
+            <div class="strip-title">Pending Column Additions</div>
+            <div class="add-col-row">
+                <input type="text" id="new-col-name" placeholder="New column name" />
+                <select id="new-col-type">
+                    <option value="varchar">varchar</option>
+                    <option value="text">text</option>
+                    <option value="int">int</option>
+                    <option value="bigint">bigint</option>
+                    <option value="float">float</option>
+                    <option value="double">double</option>
+                    <option value="decimal">decimal</option>
+                </select>
+                <button class="btn-primary btn-sm" id="add-col-btn" type="button">+ Add</button>
             </div>
+            <div class="pending-tags" id="pending-tags"></div>
+        </div>
 
-            <div class="grid header">
-                <div>Current Table Column</div>
-                <div>Next Source Name</div>
+        <div class="actions">
+            <div class="btn-group">
+                <button class="btn-primary" id="save-btn" disabled>Save Changes</button>
+                <button class="btn-secondary" id="reset-btn" type="button">Reset</button>
             </div>
+            <span class="status" id="status-text">Select a table to begin.</span>
+        </div>
+    </div>
 
-            <div id="rows"></div>
+    <!-- ── Create New Table toggle ──────────────────────────────────────────── -->
+    <div class="create-toggle">
+        <div class="divider"></div>
+        <button class="btn-new btn-sm" id="toggle-create-btn" type="button">+ Create New Table</button>
+        <div class="divider"></div>
+    </div>
 
-            <div class="actions">
-                <div>
-                    <button class="save" id="save-btn">Save</button>
-                    <button class="reset" id="reset-btn" type="button">Reset</button>
-                </div>
-                <div class="status" id="status-text">Waiting for table schema...</div>
+    <!-- ── Create New Table panel ───────────────────────────────────────────── -->
+    <div class="panel" id="create-panel">
+        <div class="panel-head">
+            <span class="panel-title">Create New Table</span>
+            <span class="panel-badge badge-blue">MySQL + Metadata</span>
+        </div>
+
+        <!-- Table name -->
+        <div style="padding:18px 26px 10px; display:grid; grid-template-columns:1fr 2fr; gap:10px; align-items:center;">
+            <label style="font-size:.85rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Table Name</label>
+            <input type="text" id="ct-table-name" placeholder="e.g. user_profiles" />
+        </div>
+
+        <!-- Column list -->
+        <div class="create-col-list">
+            <div class="strip-title" style="padding-bottom:6px">Columns</div>
+            <div id="ct-col-rows"></div>
+        </div>
+        <div class="create-add-row">
+            <button class="btn-ghost btn-sm" id="ct-add-col-btn" type="button">+ Add Column</button>
+        </div>
+
+        <!-- DDL preview -->
+        <div class="ddl-preview-label" id="ddl-label" style="display:none">Generated DDL Preview</div>
+        <pre class="ddl-preview" id="ddl-preview" style="display:none"></pre>
+
+        <div class="actions">
+            <div class="btn-group">
+                <button class="btn-primary" id="ct-submit-btn" type="button">Create Table</button>
+                <button class="btn-secondary" id="ct-cancel-btn" type="button">Cancel</button>
             </div>
-        </section>
-    </main>
+            <span class="status" id="ct-status"></span>
+        </div>
+    </div>
 
-    <script>
-        const rowsContainer = document.getElementById("rows");
-        const tableName = document.getElementById("table-name");
-        const statusText = document.getElementById("status-text");
-        const saveButton = document.getElementById("save-btn");
-        const resetButton = document.getElementById("reset-btn");
+</main>
 
-        let schemaColumns = [];
-        let currentSourceNames = {};
+<script>
+// ── state ─────────────────────────────────────────────────────────────────────
+let activeTable     = null;
+let managedTables   = [];
+let schemaColumns   = [];
+let savedSourceNames = {};
+let pendingAdditions = {};
 
-        function setStatus(message, isSuccess = false) {
-            statusText.textContent = message;
-            statusText.className = isSuccess ? "status success" : "status";
-        }
+// ── utils ─────────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const esc = s => String(s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const qs = tbl => tbl ? `?table=${encodeURIComponent(tbl)}` : "";
 
-        function createRow(column) {
-            const row = document.createElement("div");
-            row.className = "grid row";
+function setStatus(msg, type = "") {
+    const el = $("status-text");
+    el.textContent = msg;
+    el.className = "status" + (type ? " " + type : "");
+}
+function setLoading(on) {
+    $("save-btn").disabled = on || !activeTable;
+}
 
-            const currentColumn = document.createElement("div");
-            currentColumn.innerHTML = `<div class="column-name">${column.name}</div><div class="datatype">${column.datatype}</div>`;
+// ── table tabs ────────────────────────────────────────────────────────────────
+async function loadTables() {
+    try {
+        const res  = await fetch("/api/tables");
+        const data = await res.json();
+        managedTables = data.managed_tables || [];
+    } catch { managedTables = []; }
+    renderTabs();
+    const urlTable = new URLSearchParams(location.search).get("table");
+    const initial = managedTables.includes(urlTable) ? urlTable
+                  : managedTables.length ? managedTables[0] : null;
+    if (initial) selectTable(initial);
+}
 
-            const inputWrap = document.createElement("div");
-            const input = document.createElement("input");
-            input.type = "text";
-            input.placeholder = `Next source name for ${column.name}`;
-            input.value = currentSourceNames[column.name] || column.name;
-            input.dataset.tableColumn = column.name;
-            inputWrap.appendChild(input);
+function renderTabs() {
+    const container = $("table-tabs");
+    container.innerHTML = "";
+    if (!managedTables.length) {
+        container.innerHTML = '<span style="color:var(--muted);font-size:.9rem">No managed tables.</span>';
+        return;
+    }
+    managedTables.forEach(tbl => {
+        const btn = document.createElement("button");
+        btn.className = "tab" + (tbl === activeTable ? " active" : "");
+        btn.textContent = tbl;
+        btn.addEventListener("click", () => selectTable(tbl));
+        container.appendChild(btn);
+    });
+}
 
-            row.appendChild(currentColumn);
-            row.appendChild(inputWrap);
-            return row;
-        }
+function selectTable(tbl) {
+    if (tbl === activeTable) return;
+    activeTable = tbl;
+    pendingAdditions = {};
+    const url = new URL(location.href);
+    url.searchParams.set("table", tbl);
+    history.replaceState(null, "", url);
+    renderTabs();
+    loadTableSchema();
+}
 
-        function renderRows() {
-            rowsContainer.innerHTML = "";
-            schemaColumns.forEach((column) => rowsContainer.appendChild(createRow(column)));
-        }
+// ── schema loading ────────────────────────────────────────────────────────────
+async function loadTableSchema() {
+    if (!activeTable) return;
+    setStatus("Loading schema…");
+    setLoading(true);
+    showSkeletonRows(4);
+    try {
+        const res  = await fetch(`/api/schema${qs(activeTable)}`);
+        const data = await res.json();
+        schemaColumns = data.columns || [];
+        savedSourceNames = {};
+        schemaColumns.forEach(c => { savedSourceNames[c.name] = c.source_name || c.name; });
+        pendingAdditions = Object.assign({}, data.pending_additions || {});
+        $("col-count-badge").textContent = `${schemaColumns.length} column${schemaColumns.length !== 1 ? "s" : ""}`;
+        $("last-updated-meta").textContent = data.last_updated
+            ? "Updated " + new Date(data.last_updated).toLocaleString() : "";
+        renderRows();
+        renderPendingTags();
+        setStatus("Schema loaded.", "ok");
+        setLoading(false);
+    } catch (err) {
+        $("col-rows").innerHTML = `<div class="empty-state">Failed to load: ${esc(err.message)}</div>`;
+        setStatus("Failed to load schema.", "err");
+        setLoading(false);
+    }
+}
 
-        function collectRenames() {
-            const inputs = rowsContainer.querySelectorAll("input[data-table-column]");
-            const renames = {};
-            inputs.forEach((input) => {
-                const value = input.value.trim();
-                if (!value || value === input.dataset.tableColumn) {
-                    return;
-                }
-                renames[input.dataset.tableColumn] = value;
-            });
-            return renames;
-        }
+// ── column rows ───────────────────────────────────────────────────────────────
+function renderRows() {
+    const c = $("col-rows");
+    c.innerHTML = "";
+    if (!schemaColumns.length) {
+        c.innerHTML = '<div class="empty-state">No columns found.</div>';
+        return;
+    }
+    schemaColumns.forEach(col => c.appendChild(buildRow(col)));
+}
 
-        async function loadData() {
-            setStatus("Loading table schema...");
-            const response = await fetch("/api/schema");
-            const payload = await response.json();
-            schemaColumns = payload.columns || [];
-            currentSourceNames = {};
-            schemaColumns.forEach((column) => {
-                currentSourceNames[column.name] = column.source_name || column.name;
-            });
-            tableName.textContent = `Table: ${payload.table}`;
-            renderRows();
-            setStatus("Table schema loaded.");
-        }
+function buildRow(col) {
+    const row = document.createElement("div");
+    row.className = "col-grid col-row";
+    const left = document.createElement("div");
+    left.innerHTML = `<div class="col-name">${esc(col.name)}</div><div class="col-type">${esc(col.datatype||"")}</div>`;
+    const right = document.createElement("div");
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.dataset.col = col.name;
+    inp.value = savedSourceNames[col.name] || col.name;
+    inp.placeholder = `Source name for ${col.name}`;
+    inp.addEventListener("input", () => {
+        const val = inp.value.trim();
+        inp.classList.toggle("changed", val !== "" && val !== (savedSourceNames[col.name] || col.name));
+    });
+    right.appendChild(inp);
+    row.appendChild(left);
+    row.appendChild(right);
+    return row;
+}
 
-        saveButton.addEventListener("click", async () => {
-            const renames = collectRenames();
-            setStatus("Saving producer metadata...");
-            const response = await fetch("/api/producer-metadata", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ renames }),
-            });
-            const payload = await response.json();
-            currentSourceNames = {};
-            Object.entries(payload.next_source_names || payload.last_applied_names || {}).forEach(([tableColumn, sourceName]) => {
-                currentSourceNames[tableColumn] = sourceName;
-            });
-            renderRows();
-            setStatus("Producer metadata updated.", true);
+function showSkeletonRows(n) {
+    const c = $("col-rows"); c.innerHTML = "";
+    for (let i = 0; i < n; i++) {
+        const d = document.createElement("div");
+        d.className = "skeleton-row";
+        c.appendChild(d);
+    }
+}
+
+function collectRenames() {
+    const renames = {};
+    document.querySelectorAll("[data-col]").forEach(inp => {
+        const val = inp.value.trim();
+        if (val && val !== inp.dataset.col) renames[inp.dataset.col] = val;
+    });
+    return renames;
+}
+
+// ── pending additions ─────────────────────────────────────────────────────────
+function renderPendingTags() {
+    const c = $("pending-tags"); c.innerHTML = "";
+    Object.entries(pendingAdditions).forEach(([name, dtype]) => {
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.innerHTML = `${esc(name)} <em style="opacity:.7">${esc(dtype)}</em>`;
+        const rm = document.createElement("button");
+        rm.textContent = "×"; rm.title = "Remove";
+        rm.addEventListener("click", () => { delete pendingAdditions[name]; renderPendingTags(); });
+        tag.appendChild(rm);
+        c.appendChild(tag);
+    });
+}
+
+$("add-col-btn").addEventListener("click", () => {
+    const nameEl = $("new-col-name"), typeEl = $("new-col-type");
+    const name = nameEl.value.trim(), dtype = typeEl.value;
+    if (!name) { nameEl.focus(); return; }
+    if (schemaColumns.some(c => c.name === name) || pendingAdditions[name]) {
+        setStatus(`Column "${name}" already exists.`, "err"); return;
+    }
+    pendingAdditions[name] = dtype;
+    nameEl.value = "";
+    renderPendingTags();
+    setStatus(`"${name}" queued for addition.`, "ok");
+});
+
+// ── save ──────────────────────────────────────────────────────────────────────
+$("save-btn").addEventListener("click", async () => {
+    if (!activeTable) return;
+    const renames = collectRenames();
+    const additions = Object.assign({}, pendingAdditions);
+    const n = Object.keys(renames).length + Object.keys(additions).length;
+    if (!n) { setStatus("Nothing changed."); return; }
+    setStatus(`Saving ${n} change(s)…`);
+    setLoading(true);
+    try {
+        const res = await fetch(`/api/producer-metadata${qs(activeTable)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ renames, additions }),
         });
+        if (!res.ok) {
+            const e = await res.json().catch(() => ({}));
+            throw new Error(e.error || res.statusText);
+        }
+        const data = await res.json();
+        const nextNames = data.next_source_names || data.last_applied_names || {};
+        schemaColumns.forEach(c => { savedSourceNames[c.name] = nextNames[c.name] || c.name; });
+        pendingAdditions = Object.assign({}, data.pending_additions || {});
+        renderRows(); renderPendingTags();
+        $("last-updated-meta").textContent = "Updated " + new Date().toLocaleString();
+        setStatus(
+            `Saved — ${Object.keys(renames).length} rename(s), ${Object.keys(additions).length} addition(s).`,
+            "ok"
+        );
+    } catch (err) { setStatus(`Save failed: ${esc(err.message)}`, "err"); }
+    setLoading(false);
+});
 
-        resetButton.addEventListener("click", () => {
-            renderRows();
-            setStatus("Inputs reset to the last saved state.");
-        });
+$("reset-btn").addEventListener("click", () => {
+    pendingAdditions = {};
+    renderRows(); renderPendingTags();
+    setStatus("Inputs reset to last saved state.");
+});
 
-        loadData().catch(() => {
-            setStatus("Failed to load table schema.");
+// ── create-table panel ────────────────────────────────────────────────────────
+let ctCols = [];   // [{name, datatype}]
+
+function ctSetStatus(msg, type = "") {
+    const el = $("ct-status");
+    el.textContent = msg;
+    el.className = "status" + (type ? " " + type : "");
+}
+
+$("toggle-create-btn").addEventListener("click", () => {
+    const panel = $("create-panel");
+    const open  = panel.classList.toggle("open");
+    $("toggle-create-btn").textContent = open ? "✕ Close" : "+ Create New Table";
+    if (open && ctCols.length === 0) ctAddColRow();   // seed one empty row
+});
+
+$("ct-cancel-btn").addEventListener("click", () => {
+    $("create-panel").classList.remove("open");
+    $("toggle-create-btn").textContent = "+ Create New Table";
+});
+
+function ctAddColRow(name = "", dtype = "varchar") {
+    ctCols.push({ name, datatype: dtype });
+    renderCtCols();
+    updateDdlPreview();
+}
+
+$("ct-add-col-btn").addEventListener("click", () => ctAddColRow());
+
+function renderCtCols() {
+    const c = $("ct-col-rows"); c.innerHTML = "";
+    ctCols.forEach((col, i) => {
+        const row = document.createElement("div");
+        row.className = "create-col-row";
+
+        const nameInp = document.createElement("input");
+        nameInp.type = "text";
+        nameInp.value = col.name;
+        nameInp.placeholder = `column_name`;
+        nameInp.addEventListener("input", () => { ctCols[i].name = nameInp.value.trim(); updateDdlPreview(); });
+
+        const typeSelect = document.createElement("select");
+        ["varchar","text","int","bigint","float","double","decimal"].forEach(t => {
+            const opt = document.createElement("option");
+            opt.value = t; opt.textContent = t;
+            if (t === col.datatype) opt.selected = true;
+            typeSelect.appendChild(opt);
         });
-    </script>
+        typeSelect.addEventListener("change", () => { ctCols[i].datatype = typeSelect.value; updateDdlPreview(); });
+
+        const rmBtn = document.createElement("button");
+        rmBtn.className = "remove-row-btn"; rmBtn.textContent = "✕"; rmBtn.title = "Remove row";
+        rmBtn.addEventListener("click", () => { ctCols.splice(i, 1); renderCtCols(); updateDdlPreview(); });
+
+        row.appendChild(nameInp); row.appendChild(typeSelect); row.appendChild(rmBtn);
+        c.appendChild(row);
+    });
+}
+
+const MYSQL_TYPES = {
+    varchar:"VARCHAR(255)", text:"TEXT", int:"INT", integer:"INT",
+    bigint:"BIGINT", float:"FLOAT", double:"DOUBLE", decimal:"DECIMAL(10,2)"
+};
+
+function updateDdlPreview() {
+    const tblName = ($("ct-table-name").value || "").trim();
+    const validCols = ctCols.filter(c => /^[a-zA-Z][a-zA-Z0-9_]*$/.test(c.name));
+    const label = $("ddl-label"), preview = $("ddl-preview");
+    if (!tblName || !validCols.length) { label.style.display = "none"; preview.style.display = "none"; return; }
+    const colLines = validCols.map(c => `  \`${c.name}\` ${MYSQL_TYPES[c.datatype] || "VARCHAR(255)"}`).join(",\n");
+    preview.textContent = `CREATE TABLE IF NOT EXISTS \`${tblName}\` (\n${colLines}\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`;
+    label.style.display = ""; preview.style.display = "";
+}
+
+$("ct-table-name").addEventListener("input", updateDdlPreview);
+
+$("ct-submit-btn").addEventListener("click", async () => {
+    const tblName = ($("ct-table-name").value || "").trim();
+    if (!tblName) { $("ct-table-name").focus(); ctSetStatus("Table name is required.", "err"); return; }
+    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(tblName)) {
+        ctSetStatus("Table name must start with a letter and contain only letters, numbers, underscores.", "err"); return;
+    }
+    const cols = ctCols.filter(c => /^[a-zA-Z][a-zA-Z0-9_]*$/.test(c.name));
+    if (!cols.length) { ctSetStatus("Add at least one valid column.", "err"); return; }
+
+    $("ct-submit-btn").disabled = true;
+    ctSetStatus("Creating table…", "info");
+
+    try {
+        const res = await fetch("/api/create-table", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ table_name: tblName, columns: cols }),
+        });
+        const data = await res.json();
+        if (!res.ok) { ctSetStatus(data.error || res.statusText, "err"); $("ct-submit-btn").disabled = false; return; }
+
+        // Update local state
+        managedTables = data.managed_tables || managedTables;
+        ctSetStatus(`Table "${tblName}" created with ${cols.length} column(s).`, "ok");
+
+        // Reset create form
+        ctCols = [];
+        $("ct-table-name").value = "";
+        renderCtCols();
+        updateDdlPreview();
+
+        // Switch to the new table
+        renderTabs();
+        selectTable(tblName);
+
+        // Close the create panel after a short delay
+        setTimeout(() => {
+            $("create-panel").classList.remove("open");
+            $("toggle-create-btn").textContent = "+ Create New Table";
+        }, 1400);
+
+    } catch (err) {
+        ctSetStatus(`Error: ${esc(err.message)}`, "err");
+    }
+    $("ct-submit-btn").disabled = false;
+});
+
+// ── boot ──────────────────────────────────────────────────────────────────────
+loadTables();
+</script>
 </body>
 </html>
